@@ -135,3 +135,90 @@ t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
 plt.figure()
 plt.plot(t,Setpoint,'b*')
 plt.show()
+
+import sympy
+from sympy.simplify.simplify import simplify
+from sympy.core.function import diff
+
+# Symbolic Variables
+C_Fluid = sympy.Symbol("C_Fluid")
+C_Reservoir = sympy.Symbol("C_Reservoir")
+C_HEXplate = sympy.Symbol("C_HEXplate")
+R_Fluid_Ambient = sympy.Symbol("R_Fluid_Ambient")
+R_Reservoir_Ambient = sympy.Symbol("R_Reservoir_Ambient")
+R_HEXplate_Ambient = sympy.Symbol("R_HEXplate_Ambient")
+R_Fluid_Reservoir = sympy.Symbol("R_Fluid_Reservoir")
+T_Ambient = sympy.Symbol("T_Ambient")
+R_TEC = sympy.Symbol("R_TEC")
+alpha_TEC = sympy.Symbol("alpha_TEC")
+K_TEC = sympy.Symbol("K_TEC")
+qmax_HEX = sympy.Symbol("qmax_HEX")
+
+# Define generalized coordinates as functions of time
+# and specify their derivatives for prettier computation
+t = sympy.Symbol("t")
+T_Fluid_func = sympy.Function("T_Fluid")
+T_Reservoir_func = sympy.Function("T_Reservoir")
+T_HEXplate_func = sympy.Function("T_HEXplate")
+V_TEC_func = sympy.Function("V_TEC")
+q_HEX_func = sympy.Function("q_HEX")
+
+Tdot_Fluid_func = sympy.Function("Tdot_Fluid")
+Tdot_Reservoir_func = sympy.Function("Tdot_Reservoir")
+Tdot_HEXplate_func = sympy.Function("Tdot_HEXplate")
+
+T_Fluid_func.fdiff = lambda self, argindex=1: T_Fluid_func(self.args[argindex-1])
+T_Reservoir_func.fdiff = lambda self, argindex=1: T_Reservoir_func(self.args[argindex-1])
+T_HEXplate_func.fdiff = lambda self, argindex=1: T_HEXplate_func(self.args[argindex-1])
+V_TEC_func.fdiff = lambda self, argindex=1: V_TEC_func(self.args[argindex-1])
+q_HEX_func.fdiff = lambda self, argindex=1: q_HEX_func(self.args[argindex-1])
+Tdot_Fluid_func.fdiff = lambda self, argindex=1: Tdot_Fluid_func(self.args[argindex-1])
+Tdot_Reservoir_func.fdiff = lambda self, argindex=1: Tdot_Reservoir_func(self.args[argindex-1])
+Tdot_HEXplate_func.fdiff = lambda self, argindex=1: Tdot_HEXplate_func(self.args[argindex-1])
+
+T_Fluid = T_Fluid_func(t)
+T_Reservoir= T_Reservoir_func(t)
+T_HEXplate = T_HEXplate_func(t)
+V_TEC = V_TEC_func(t)
+q_HEX = q_HEX_func(t)
+
+# First derivatives
+Tdot_Fluid = sympy.diff(T_Fluid, t)
+Tdot_Reservoir = sympy.diff(T_Reservoir, t)
+Tdot_HEXplate = sympy.diff(T_HEXplate, t)
+
+q_Fluid_Ambient = (T_Fluid - T_Ambient)/R_Fluid_Ambient
+q_Reservoir_Ambient = (T_Reservoir - T_Ambient)/R_Reservoir_Ambient
+q_HEXplate_Ambient = (T_HEXplate - T_Ambient)/R_HEXplate_Ambient
+q_Fluid_Reservoir = (T_Reservoir - T_Fluid)/R_Fluid_Reservoir
+q_Reservoir_Fluid = -q_Fluid_Reservoir
+q_TEC_Reservoir =  alpha_TEC*T_Reservoir*V_TEC/R_TEC - 0.5*V_TEC**2/R_TEC + K_TEC*(T_Reservoir - T_HEXplate) # From Mathworks documentation of TEC modeling
+q_TEC_HEXplate = -alpha_TEC*T_HEXplate*V_TEC/R_TEC - 0.5*V_TEC**2/R_TEC + K_TEC*(T_HEXplate - T_Reservoir)
+
+Tdot_Fluid = -q_Fluid_Reservoir/C_Fluid
+Tdot_Reservoir =  (q_Fluid_Reservoir - q_Reservoir_Ambient - q_TEC_Reservoir)/C_Reservoir
+Tdot_HEXplate = (-q_HEXplate_Ambient-q_HEX-q_TEC_HEXplate)/C_HEXplate
+
+state_outputs = sympy.Matrix([[Tdot_Fluid],[Tdot_Reservoir],[Tdot_HEXplate]])
+#state_outputs.jacobian([T_Fluid, T_Reservoir, T_HEXplate])
+state_outputs.jacobian([V_TEC, q_HEX])
+
+from scipy.signal import cont2discrete
+
+B = np.array([[0,0],
+              [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
+              [(((alpha_TEC*T_HEXplate)/R_TEC)+(V_TEC/R_TEC))/C_HEXplate,-1/C_HEXplate]])
+C = np.eye(3)
+D = np.array([[0,0],[0,0],[0,0]])
+
+Ad, Bd, Cd, Dd, dt = cont2discrete((A,B,C,D), dt, method='euler')
+
+def equality_const_rule(self, model, i, t):
+    return model.x[i, t+1] - (sum(model.A[i, j] * model.x[j, t] for j in model.xIDX)
+           + sum(model.B[i, j] * model.u[j, t] for j in model.uIDX))
+
+model.equality_constraints = pyo.Constraint(model.xIDX, model.tIDX, rule=equality_const_rule)
+
+model.init_const1 = pyo.Constraint(expr = model.x[0, 0] == x0[0])
+model.init_const2 = pyo.Constraint(expr = model.x[1, 0] == x0[1])
+model.init_const3 = pyo.Constraint(expr = model.x[2, 0] == x0[2])
