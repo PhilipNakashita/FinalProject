@@ -246,6 +246,12 @@ class MPC_Controller():
     self.numStates = np.size(A,0)
     self.numInputs = np.size(B,1)
     self.M = M
+    xL = 5
+    xU = 150
+    u = np.array([-12,0],[12,1])
+    uL = np.array([-12,0])
+    uU = np.array([12,1]) 
+    
 
     self.model = pyo.ConcreteModel()
     self.model.N = N
