@@ -4,30 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
 
-class PID_Controller():
-  def __init__(self):
-    # Initialize Default Gains
-    self.Kp = 1
-    self.Ki = 1
-    self.Kd = 1
-
-    pass
-
-  def setProportionalGain(self,P):
-    pass
-
-  def setIntegralGain(self,I):
-    pass
-
-  def setDerivativeGain(self,D):
-    pass
-
-  def setIntegralWindupMode(self,mode):
-    pass
-
-  def computeControlInput(self):
-    pass
-
 class MPC_Controller():
   def __init__(self):
     pass
