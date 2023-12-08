@@ -203,3 +203,41 @@ model.equality_constraints = pyo.Constraint(model.xIDX, model.tIDX, rule=equalit
 model.init_const1 = pyo.Constraint(expr = model.x[0, 0] == x0[0])
 model.init_const2 = pyo.Constraint(expr = model.x[1, 0] == x0[1])
 model.init_const3 = pyo.Constraint(expr = model.x[2, 0] == x0[2])
+
+def update_LD(self, x, u):
+   # Model Constant Values
+  C_Fluid = 800
+  C_Reservoir = 1000
+  C_HEXplate = 600
+
+  R_Fluid_Ambient = 10
+  R_Reservoir_Ambient = 3
+  R_HEXplate_Ambient = 1
+  R_Fluid_Reservoir = 0.5
+
+  T_Ambient = 23
+
+  R_TEC = 0.02              # Electrical Resistance of Thermoelectric device in Ohms
+  alpha_TEC = 220 * 10**-6  # Seebeck Coefficient of TEC in V/Kelvin
+  K_TEC = 1.5 * 10**-3      # Thermal Conductance of TEC between hot and cold side
+  qmax_HEX = 80  
+
+  # State Variables
+  T_Fluid = x[0]
+  T_Reservoir = x[1]
+  T_HEXplate = x[2]
+
+  # Control Inputs
+  V_TEC = u[0]                                              # Voltage Applied to TEC module
+  q_HEX = min(u[1]*(T_HEXplate - T_Ambient)/0.01,qmax_HEX)  # Liquid to Ambient Heat Exchanger
+
+  A = np.array(A = np.array([[(1/(C_Fluid*R_Fluid_Reservoir)),-(1/(C_Fluid*R_Fluid_Reservoir)),0],
+              [-(1/(C_Fluid*R_Fluid_Reservoir)),(-K_TEC-((alpha_TEC*V_TEC)/R_TEC)-(1/R_Reservoir_Ambient)+(1/R_Fluid_Reservoir))/(C_Reservoir) ,K_TEC/C_Reservoir],
+              [0, K_TEC/C_HEXplate, ()/(C_HEXplate)]]))
+  B = np.array([[0,0],
+              [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
+              [(((alpha_TEC*T_HEXplate)/R_TEC)+(V_TEC/R_TEC))/C_HEXplate,-1/C_HEXplate]])
+  
+return A, B 
+
+
