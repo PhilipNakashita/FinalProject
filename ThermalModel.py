@@ -114,9 +114,7 @@ t = np.linspace(0,N*Ts,N+1)/60
 for k in range(N):
   x_next = thermoElectricTempControlModel(Ts,x[k,:],u[k,:])
   x = np.append(x,x_next,axis=0)
-
-#I will implement an MPC controller after thursday. Shouldn't take too long.
-
+  
 import sympy
 from sympy.simplify.simplify import simplify
 from sympy.core.function import diff
