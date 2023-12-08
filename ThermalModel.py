@@ -3,6 +3,10 @@ import pyomo.environ as pyo
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import interpolate
+import sympy
+from sympy.simplify.simplify import simplify
+from sympy.core.function import diff
+from scipy.signal import cont2discrete
 
 class PID_Controller():
   def __init__(self):
@@ -114,10 +118,6 @@ t = np.linspace(0,N*Ts,N+1)/60
 for k in range(N):
   x_next = thermoElectricTempControlModel(Ts,x[k,:],u[k,:])
   x = np.append(x,x_next,axis=0)
-  
-import sympy
-from sympy.simplify.simplify import simplify
-from sympy.core.function import diff
 
 # Symbolic Variables
 C_Fluid = sympy.Symbol("C_Fluid")
@@ -181,8 +181,6 @@ Tdot_HEXplate = (-q_HEXplate_Ambient-q_HEX-q_TEC_HEXplate)/C_HEXplate
 state_outputs = sympy.Matrix([[Tdot_Fluid],[Tdot_Reservoir],[Tdot_HEXplate]])
 #state_outputs.jacobian([T_Fluid, T_Reservoir, T_HEXplate])
 state_outputs.jacobian([V_TEC, q_HEX])
-
-from scipy.signal import cont2discrete
 
 B = np.array([[0,0],
               [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
