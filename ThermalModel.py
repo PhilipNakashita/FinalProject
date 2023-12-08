@@ -158,24 +158,6 @@ state_outputs = sympy.Matrix([[Tdot_Fluid],[Tdot_Reservoir],[Tdot_HEXplate]])
 #state_outputs.jacobian([T_Fluid, T_Reservoir, T_HEXplate])
 state_outputs.jacobian([V_TEC, q_HEX])
 
-B = np.array([[0,0],
-              [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
-              [(((alpha_TEC*T_HEXplate)/R_TEC)+(V_TEC/R_TEC))/C_HEXplate,-1/C_HEXplate]])
-C = np.eye(3)
-D = np.array([[0,0],[0,0],[0,0]])
-
-Ad, Bd, Cd, Dd, dt = cont2discrete((A,B,C,D), dt, method='euler')
-
-def equality_const_rule(self, model, i, t):
-    return model.x[i, t+1] - (sum(model.A[i, j] * model.x[j, t] for j in model.xIDX)
-           + sum(model.B[i, j] * model.u[j, t] for j in model.uIDX))
-
-model.equality_constraints = pyo.Constraint(model.xIDX, model.tIDX, rule=equality_const_rule)
-
-model.init_const1 = pyo.Constraint(expr = model.x[0, 0] == x0[0])
-model.init_const2 = pyo.Constraint(expr = model.x[1, 0] == x0[1])
-model.init_const3 = pyo.Constraint(expr = model.x[2, 0] == x0[2])
-
 def update_LD(self, x, u):
    # Model Constant Values
   C_Fluid = 800
@@ -209,103 +191,13 @@ def update_LD(self, x, u):
   B = np.array([[0,0],
               [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
               [(((alpha_TEC*T_HEXplate)/R_TEC)+(V_TEC/R_TEC))/C_HEXplate,-1/C_HEXplate]])
-  
-return A, B 
 
-class MPC_Controller():
-  def __init__(self,A,B,N,Q,R,x0,Af=[],bf=[]):
-    # Initialize values for LQR MPC problem
-    self.numStates = np.size(A,0)
-    self.numInputs = np.size(B,1)
-    self.M = M
-    xL = 5
-    xU = 150
-    u = np.array([-12,0],[12,1])
-    uL = np.array([-12,0])
-    uU = np.array([12,1]) 
-    
-
-    self.model = pyo.ConcreteModel()
-    self.model.N = N
-    self.model.A = A
-    self.model.B = B
-    self.model.P = P
-    self.model.Q = Q
-    self.model.R = R
-    self.model.Af = Af
-    self.model.bf = bf
-    self.model.x0 = x0
-    self.model.xref = []
-
-    self.model.tidx = pyo.Set(initialize = range(self.model.N + 1))
-    self.model.xidx = pyo.Set(initialize = range(self.numStates))
-    self.model.uidx = pyo.Set(initialize = range(self.numInputs))
-
-    self.model.x = pyo.Var(self.model.xidx, self.model.tidx)
-    self.model.u = pyo.Var(self.model.uidx, self.model.tidx)
-    pass
-
-  def solve_cftoc(self,A,B,xref):
-    self.model.xref = xref
-    self.model.A = A
-    self.model.B = B
-    self.update_cost_function()
-    self.set_state_constraints()
-
-  def set_state_constraints(self):
-    self.model.StateConstraint = pyo.ConstraintList()
-    if np.any(self.model.Af) == True:
-      for i in range(np.size(self.model.bf)):
-        self.model.StateConstraint.add(expr = sum(self.model.Af[i,j]*self.model.x[j,N] for j in range(np.size(self.model.Af,1))) <= self.model.bf[i])
-     else:
-      for i in self.model.xidx:
-        self.model.StateConstraint.add(expr = self.model.x[i,N] == self.model.bf[i])
-    pass
-
-  def set_input_constraints(self,B_f):
-    pass
-
-  def set_terminal_constraints(self,X_f):
-    pass
-
-  def set_state_cost_matrix(self,Q):
-    try:
-      self.model.Q = Q
-      return True
-    except:
-      return False
-
-  def set_input_cost_matrix(self,R):
-    try:
-      self.model.R = R
-      return True
-    except:
-      return False
-
-  def update_cost_function(self):
-    stateCost = 0.0
-    inputCost = 0.0
-    for t in self.model.tidx:
-      for i in self.model.xidx:
-        for j in self.model.xidx:
-          if t < self.model.N:
-            stateCost += (self.model.x[i,t] - self.model.xref[i,t])*self.model.Q[i,j]*(self.model.x[j,t] - self.model.xref[j,t])
-    for t in self.model.tidx:
-      for i in self.model.uidx:
-        for j in self.model.uidx:
-          if t < self.model.N:
-            inputCost += self.model.u[i,t]*self.model.R[i,j]*self.model.u[j,t]
-    return stateCost + inputCost
-
-    pass
-
-  B = np.array([[0,0],
-              [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
-              [(((alpha_TEC*T_HEXplate)/R_TEC)+(V_TEC/R_TEC))/C_HEXplate,-1/C_HEXplate]])
   C = np.eye(3)
   D = np.array([[0,0],[0,0],[0,0]])
 
   Ad, Bd, Cd, Dd, dt = cont2discrete((A,B,C,D), dt, method='euler')
+
+  return Ad, Bd  
 
 Q = np.array([[100,0,0],[0,1,0],[0,0,1]]) # expand to N number of steps
 R = np.array([[1,0],[0,1]])
