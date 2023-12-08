@@ -322,7 +322,6 @@ class MPC_Controller():
     return stateCost + inputCost
 
     pass
-  from scipy.signal import cont2discrete
 
   B = np.array([[0,0],
               [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
@@ -332,7 +331,6 @@ class MPC_Controller():
 
   Ad, Bd, Cd, Dd, dt = cont2discrete((A,B,C,D), dt, method='euler')
 
-import numpy as np
 Q = np.array([[100,0,0],[0,1,0],[0,0,1]]) # expand to N number of steps
 R = np.array([[1,0],[0,1]])
 # Model Constant Values
