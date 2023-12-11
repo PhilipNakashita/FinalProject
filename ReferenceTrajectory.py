@@ -12,11 +12,12 @@ def generateTrajectory(Times,Temperatures,Ts):
 
 ## Example Trajectory Generation
 
-timePoints = [0, 300, 900, 1200, 1800, 2100]
-TempPoints = [23, 23, 65, 65, 23, 23]
-Ts = 5
-t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
+if __name__ == '__main__':
+  timePoints = [0, 300, 900, 1200, 1800, 2100]
+  TempPoints = [23, 23, 65, 65, 23, 23]
+  Ts = 5
+  t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
 
-plt.figure()
-plt.plot(t,Setpoint,'b*')
-plt.show()
+  plt.figure()
+  plt.plot(t,Setpoint,'b*')
+  plt.show()

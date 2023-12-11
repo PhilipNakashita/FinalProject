@@ -8,28 +8,23 @@ from sympy.simplify.simplify import simplify
 from sympy.core.function import diff
 from scipy.signal import cont2discrete
 
-class MPC_Controller():
-  def __init__(self):
-    pass
-
-
 def thermoElectricTempControlModel(Ts, x, u):
   # Model Constant Values
-  C_Fluid = 800
-  C_Reservoir = 1000
-  C_HEXplate = 600
+  C_Fluid = 800.0
+  C_Reservoir = 1000.0
+  C_HEXplate = 600.0
 
-  R_Fluid_Ambient = 10
-  R_Reservoir_Ambient = 3
-  R_HEXplate_Ambient = 1
+  R_Fluid_Ambient = 10.0
+  R_Reservoir_Ambient = 3.0
+  R_HEXplate_Ambient = 1.0
   R_Fluid_Reservoir = 0.5
 
-  T_Ambient = 23
+  T_Ambient = 23.0
 
   R_TEC = 0.02              # Electrical Resistance of Thermoelectric device in Ohms
   alpha_TEC = 220 * 10**-6  # Seebeck Coefficient of TEC in V/Kelvin
   K_TEC = 1.5 * 10**-3      # Thermal Conductance of TEC between hot and cold side
-  qmax_HEX = 80             # Maximum Cooling capability of Heat exchanger in Watts
+  qmax_HEX = 80.0            # Maximum Cooling capability of Heat exchanger in Watts
 
   # State Variables
   T_Fluid = x[0]
@@ -64,7 +59,7 @@ def thermoElectricTempControlModel(Ts, x, u):
   return x_next
 
 def plotResults(t,x):
-  fig = plt.figure(figsize=(9,5));
+  fig = plt.figure(figsize=(9,5))
   plt.subplot(1,3,1)
   plt.plot(t,x[:,0])
   plt.subplot(1,3,2)
@@ -94,6 +89,8 @@ t = np.linspace(0,N*Ts,N+1)/60
 for k in range(N):
   x_next = thermoElectricTempControlModel(Ts,x[k,:],u[k,:])
   x = np.append(x,x_next,axis=0)
+
+plotResults(t,x)
 
 # Symbolic Variables
 C_Fluid = sympy.Symbol("C_Fluid")
@@ -187,7 +184,7 @@ def update_LD(self, x, u):
 
   A = np.array(A = np.array([[(1/(C_Fluid*R_Fluid_Reservoir)),-(1/(C_Fluid*R_Fluid_Reservoir)),0],
               [-(1/(C_Fluid*R_Fluid_Reservoir)),(-K_TEC-((alpha_TEC*V_TEC)/R_TEC)-(1/R_Reservoir_Ambient)+(1/R_Fluid_Reservoir))/(C_Reservoir) ,K_TEC/C_Reservoir],
-              [0, K_TEC/C_HEXplate, ()/(C_HEXplate)]]))
+              [0, K_TEC/C_HEXplate, (-K_TEC-((alpha_TEC*V_TEC)/R_TEC)-(1/R_HEXplate_Ambient))/(C_HEXplate)]]))
   B = np.array([[0,0],
               [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
               [(((alpha_TEC*T_HEXplate)/R_TEC)+(V_TEC/R_TEC))/C_HEXplate,-1/C_HEXplate]])
@@ -221,7 +218,7 @@ qmax_HEX = 80             # Maximum Cooling capability of Heat exchanger in Watt
 
 A = np.array([[(1/(C_Fluid*R_Fluid_Reservoir)),-(1/(C_Fluid*R_Fluid_Reservoir)),0],
               [-(1/(C_Fluid*R_Fluid_Reservoir)),(-K_TEC-((alpha_TEC*V_TEC)/R_TEC)-(1/R_Reservoir_Ambient)+(1/R_Fluid_Reservoir))/(C_Reservoir) ,K_TEC/C_Reservoir],
-              [0, K_TEC/C_HEXplate, ()/(C_HEXplate)]])
+              [0, K_TEC/C_HEXplate, (-K_TEC-((alpha_TEC*V_TEC)/R_TEC)-(1/R_HEXplate_Ambient))/(C_HEXplate)]])
 def cftoc(A,B,N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan):
     # Initialize values for LQR MPC problem
     numStates = np.size(A,0)
@@ -231,7 +228,6 @@ def cftoc(A,B,N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan):
     model.N = N
     model.A = A
     model.B = B
-    model.P = P
     model.Q = Q
     model.R = R
     model.Af = Af
@@ -262,7 +258,7 @@ def cftoc(A,B,N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan):
               inputCost += model.u[i,t]*model.R[i,j]*model.u[j,t]
       return stateCost + inputCost
 
-    model.cost = pyo.Objective(rule = objective_rule, sense = pyo.minimize)
+    model.cost = pyo.Objective(rule = update_cost_function, sense = pyo.minimize)
 
     # Terminal constraint
     def equality_const_rule(model, i, t):
@@ -305,13 +301,3 @@ def cftoc(A,B,N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan):
     JOpt = model.cost()
 
     return [model, feas, xOpt, uOpt, JOpt]
-
-print('JOpt=', JOpt)
-
-fig = plt.figure(figsize=(9, 6))
-plt.plot(xOpt.T)
-plt.ylabel('x')
-fig = plt.figure(figsize=(9, 6))
-plt.plot(uOpt.T)
-plt.ylabel('u')
-plt.show()
