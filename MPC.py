@@ -1,12 +1,10 @@
-from ReferenceTrajectory import generateTrajectory, Setpoint
 import numpy as np
-import ThermalModel
 import importlib
 import pyomo.environ as pyo
 import matplotlib.pyplot as plt
 
 class MPC_Controller():
-   
+
     def __init__(self,A,B,N,Q,R,Xl,Xu,Ul,Uu,x0,xref):
         self.model = pyo.ConcreteModel()
 
@@ -22,15 +20,15 @@ class MPC_Controller():
         self.model.Ul = Ul
         self.model.Uu = Uu
         self.init_variables()
-       
+
         self.model.cost = pyo.Objective(rule = lambda model: self.objective_function(), sense = pyo.minimize)
         self.set_state_constraints()
         self.set_input_constraints()
         self.set_dynamics_constraints()
         self.solve()
-        self.x_opt = np.asarray([[self.model.x[i,t]() for i in self.model.xidx] for t in self.model.tidx]).T
-        self.u_opt = self.model.u
-       
+        self.x_opt = np.asarray([[self.model.x[i,t]() for i in self.model.xidx] for t in self.model.tidx])
+        self.u_opt = np.asarray([[self.model.u[i,t]() for i in self.model.uidx] for t in self.model.tidx])
+
 
     def init_variables(self):
         self.model.num_states = np.size(A,0)
@@ -84,3 +82,33 @@ class MPC_Controller():
     def solve(self):
         solver = pyo.SolverFactory('ipopt')
         results = solver.solve(self.model)
+
+#A, B = linearized_discretrized_dynamics([273+23, 273+23, 273+23], [0, 0], 5)
+N = 10
+Q = np.array([[100, 0, 0], [0, 1, 0], [0, 0, 1]])
+R = np.identity(2)
+Xl = (273+5) 
+Xu = (273+150) 
+Ul = np.array([-12, 0])
+Uu = np.array([12, 1])
+x0 = np.array([273+23, 273+23, 273+23])
+
+x_actual = []
+u_actual = []
+x_cur = x0
+u_cur = [0,0]
+x_OL = np.zeros((3,N+1,len(t)))
+
+for i in range(0, len(t)):
+  A, B = linearized_discretrized_dynamics(x_cur, u_cur, 5)
+  xref = np.array([Setpoint[i:i+N], Setpoint[i:i+N], Setpoint[i:i+N]])
+  model, feas, xOpt, uOpt, JOpt = cftoc(A, B, N, Q, R, xref, x_cur, Xl, Xu, Ul, Uu)
+  x_OL[:,:,i] = xOpt
+  x_cur = xOpt[:,0]
+  x_actual.append(xOpt[:,0])
+  u_actual.append(uOpt[:,0])
+  u_cur = uOpt[:,0]
+  line1 = plt.plot(t[i:i+N+1],xOpt[0,:], 'r--')
+x_actual = np.array(x_actual)
+u_actual = np.array(u_actual)
+line2 = plt.plot(t,x_actual[:,0], 'bo-')
