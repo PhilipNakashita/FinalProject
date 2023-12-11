@@ -155,7 +155,7 @@ state_outputs = sympy.Matrix([[Tdot_Fluid],[Tdot_Reservoir],[Tdot_HEXplate]])
 #state_outputs.jacobian([T_Fluid, T_Reservoir, T_HEXplate])
 state_outputs.jacobian([V_TEC, q_HEX])
 
-def update_LD(self, x, u):
+def linearized_discretrized_dynamics(x, u, dt):
    # Model Constant Values
   C_Fluid = 800
   C_Reservoir = 1000
@@ -180,11 +180,11 @@ def update_LD(self, x, u):
 
   # Control Inputs
   V_TEC = u[0]                                              # Voltage Applied to TEC module
-  q_HEX = min(u[1]*(T_HEXplate - T_Ambient)/0.01,qmax_HEX)  # Liquid to Ambient Heat Exchanger
+  # q_HEX = min(u[1]*(T_HEXplate - T_Ambient)/0.01,qmax_HEX)  # Liquid to Ambient Heat Exchanger
 
-  A = np.array(A = np.array([[(1/(C_Fluid*R_Fluid_Reservoir)),-(1/(C_Fluid*R_Fluid_Reservoir)),0],
+  A = np.array([[(1/(C_Fluid*R_Fluid_Reservoir)),-(1/(C_Fluid*R_Fluid_Reservoir)),0],
               [-(1/(C_Fluid*R_Fluid_Reservoir)),(-K_TEC-((alpha_TEC*V_TEC)/R_TEC)-(1/R_Reservoir_Ambient)+(1/R_Fluid_Reservoir))/(C_Reservoir) ,K_TEC/C_Reservoir],
-              [0, K_TEC/C_HEXplate, (-K_TEC-((alpha_TEC*V_TEC)/R_TEC)-(1/R_HEXplate_Ambient))/(C_HEXplate)]]))
+              [0, K_TEC/C_HEXplate, (-K_TEC + ((alpha_TEC * V_TEC)/R_TEC) - (1 / R_HEXplate_Ambient))/(C_HEXplate)]])
   B = np.array([[0,0],
               [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
               [(((alpha_TEC*T_HEXplate)/R_TEC)+(V_TEC/R_TEC))/C_HEXplate,-1/C_HEXplate]])
