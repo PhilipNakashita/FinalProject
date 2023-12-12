@@ -1,86 +1,172 @@
-from ReferenceTrajectory import generateTrajectory, Setpoint
-import numpy as np
-import ThermalModel
-import importlib
+from __future__ import division
 import pyomo.environ as pyo
+import numpy as np
 import matplotlib.pyplot as plt
+from scipy import interpolate
+import sympy
+from sympy.simplify.simplify import simplify
+from sympy.core.function import diff
+from scipy.signal import cont2discrete
+from ReferenceTrajectory import generateTrajectory
 
-class MPC_Controller():
-   
-    def __init__(self,A,B,N,Q,R,Xl,Xu,Ul,Uu,x0,xref):
-        self.model = pyo.ConcreteModel()
+def cftoc(N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan):
+    # Initialize values for LQR MPC problem
+    numStates = 3
+    numInputs = 2
 
-        self.model.A = A
-        self.model.B = B
-        self.model.N = N
-        self.model.Q = Q
-        self.model.R = R
-        self.model.x0 = x0
-        self.model.xref = xref
-        self.model.Xl = Xl
-        self.model.Xu = Xu
-        self.model.Ul = Ul
-        self.model.Uu = Uu
-        self.init_variables()
-       
-        self.model.cost = pyo.Objective(rule = lambda model: self.objective_function(), sense = pyo.minimize)
-        self.set_state_constraints()
-        self.set_input_constraints()
-        self.set_dynamics_constraints()
-        self.solve()
-        self.x_opt = np.asarray([[self.model.x[i,t]() for i in self.model.xidx] for t in self.model.tidx]).T
-        self.u_opt = self.model.u
-       
+    model = pyo.ConcreteModel()
+    model.N = N
+    model.Q = Q
+    model.R = R
+    model.Af = Af
+    model.bf = bf
+    model.x0 = x0
+    model.xref = xref
 
-    def init_variables(self):
-        self.model.num_states = np.size(A,0)
-        self.model.num_inputs = np.size(B,1)
-        self.model.tidx = pyo.Set(initialize = range(self.model.N + 1))
-        self.model.xidx = pyo.Set(initialize = range(self.model.num_states))
-        self.model.uidx = pyo.Set(initialize = range(self.model.num_inputs))
-        self.model.x = pyo.Var(self.model.xidx, self.model.tidx)
-        self.model.u = pyo.Var(self.model.uidx, self.model.tidx)
+    model.tidx = pyo.Set(initialize = range(model.N + 1), ordered=True )
+    model.xidx = pyo.Set(initialize = range(numStates), ordered=True )
+    model.uidx = pyo.Set(initialize = range(numInputs), ordered=True )
 
-    def set_state_constraints(self):
-        self.model.state_contraints = pyo.ConstraintList()
-        for t in range(self.model.N):
-            for i in range(self.model.num_states):
-                self.model.state_contraints.add(expr = self.model.x[i, t] >= self.model.Xl[i])
-                self.model.state_contraints.add(expr = self.model.x[i, t] <= self.model.Xu[i])
-        for i in range(self.model.num_states):
-            self.model.state_contraints.add(expr = self.model.x[i, 0] == self.model.x0[i])
+    model.x = pyo.Var(model.xidx, model.tidx)
+    model.u = pyo.Var(model.uidx, model.tidx)
 
-    def set_input_constraints(self):
-        self.model.input_contraints = pyo.ConstraintList()
-        for t in range(self.model.N - 1):
-            for i in range(self.model.num_inputs):
-                self.model.input_contraints.add(expr = self.model.u[i, t] >= self.model.Ul[i])
-                self.model.input_contraints.add(expr = self.model.u[i, t] <= self.model.Uu[i])
 
-    def set_dynamics_constraints(self):
-        self.model.dynamics_contraints = pyo.ConstraintList()
-        for t in range(self.model.N - 1):
-            for i in range(self.model.num_states):
-                self.model.dynamics_contraints.add(expr =
-                                                   (sum(self.model.A[i, j] * self.model.x[j, t] for j in self.model.xidx)
-                                                    + sum(self.model.B[i, j] * self.model.u[j, t] for j in self.model.uidx)
-                                                    == self.model.x[i, t+1]))
+    def update_cost_function(model):
+      stateCost = 0.0
+      inputCost = 0.0
+      for t in model.tidx:
+        for i in model.xidx:
+          for j in model.xidx:
+            if t < model.N:
+              stateCost += (model.x[i,t] - model.xref[i,t])*model.Q[i,j]*(model.x[j,t] - model.xref[j,t])
+      for t in model.tidx:
+        for i in model.uidx:
+          for j in model.uidx:
+            if t < model.N:
+              inputCost += model.u[i,t]*model.R[i,j]*model.u[j,t]
+      return stateCost + inputCost
 
-    def objective_function(self):
-        stateCost = 0.0
-        inputCost = 0.0
-        for t in self.model.tidx:
-          for i in self.model.xidx:
-            for j in self.model.xidx:
-              if t < self.model.N:
-                stateCost += (self.model.x[i,t] - self.model.xref[i,t])*self.model.Q[i,j]*(self.model.x[j,t] - self.model.xref[j,t])
-        for t in self.model.tidx:
-          for i in self.model.uidx:
-            for j in self.model.uidx:
-              if t < self.model.N:
-                inputCost += self.model.u[i,t]*self.model.R[i,j]*self.model.u[j,t]
-        return stateCost + inputCost
+    model.cost = pyo.Objective(rule = update_cost_function, sense = pyo.minimize)
 
-    def solve(self):
-        solver = pyo.SolverFactory('ipopt')
-        results = solver.solve(self.model)
+
+    model.dynamics_contraints = pyo.ConstraintList()
+    for t in range(model.N - 1):
+            Ts = 5
+            C_Fluid = 200.0
+            C_Reservoir = 400.0
+            C_HEXplate = 300.0
+           
+            R_Fluid_Ambient = 10.0
+            R_Reservoir_Ambient = 3.0
+            R_HEXplate_Ambient = 1.0
+            R_Fluid_Reservoir = 0.2
+           
+            T_Ambient = 23.0 + 273
+           
+            R_TEC = 3.0              # Electrical Resistance of Thermoelectric device in Ohms
+            alpha_TEC = 220 * 10**-4  # Seebeck Coefficient of TEC in V/Kelvin
+            K_TEC = 1.5 * 10**-2      # Thermal Conductance of TEC between hot and cold side
+            qmax_HEX = 80.0            # Maximum Cooling capability of Heat exchanger in Watts
+           
+            # State Variables
+            T_Fluid = model.x[0, t]
+            T_Reservoir = model.x[1, t]
+            T_HEXplate = model.x[2, t]
+           
+            # Control Inputs
+            V_TEC = model.u[0, t]                                              # Voltage Applied to TEC module
+            q_HEX = model.u[1, t]*(T_HEXplate - T_Ambient)/0.01  # Liquid to Ambient Heat Exchanger TODO figure out MAX!!
+           
+            # Heat Flowrates
+            q_Fluid_Ambient = (T_Fluid - T_Ambient)/R_Fluid_Ambient
+            q_Reservoir_Ambient = (T_Reservoir - T_Ambient)/R_Reservoir_Ambient
+            q_HEXplate_Ambient = (T_HEXplate - T_Ambient)/R_HEXplate_Ambient
+            q_Fluid_Reservoir = (T_Reservoir - T_Fluid)/R_Fluid_Reservoir
+            q_Reservoir_Fluid = -q_Fluid_Reservoir
+            q_TEC_Reservoir =  alpha_TEC*(T_Reservoir)*V_TEC/R_TEC - 0.5*V_TEC**2/R_TEC + K_TEC*(T_Reservoir - T_HEXplate) # From Mathworks documentation of TEC modeling
+            q_TEC_HEXplate = -alpha_TEC*(T_HEXplate)*V_TEC/R_TEC - 0.5*V_TEC**2/R_TEC + K_TEC*(T_HEXplate - T_Reservoir)
+           
+            # State Derivatives
+            Tdot_Fluid = 1/C_Fluid*(-q_Fluid_Ambient + q_Fluid_Reservoir)
+            Tdot_Reservoir = 1/C_Reservoir*(q_Fluid_Reservoir - q_Reservoir_Ambient - q_TEC_Reservoir)
+            Tdot_HEXplate = 1/C_HEXplate*(q_HEXplate_Ambient - q_TEC_HEXplate - q_HEX)
+           
+            # Euler Discretization and Caluclation of Next State
+            model.dynamics_contraints.add(expr = model.x[0, t+1] == Ts*Tdot_Fluid + T_Fluid)
+            model.dynamics_contraints.add(expr = model.x[1, t+1] == Ts*Tdot_Reservoir + T_Reservoir)
+            model.dynamics_contraints.add(expr = model.x[2, t+1] == Ts*Tdot_HEXplate + T_HEXplate)
+
+    # Initial value constraints
+    model.init_const1 = pyo.Constraint(expr = model.x[0, 0] == x0[0])
+    model.init_const2 = pyo.Constraint(expr = model.x[1, 0] == x0[1])
+    model.init_const3 = pyo.Constraint(expr = model.x[2, 0] == x0[2])
+
+    # Define state and input constraints
+    model.constraint1= pyo.Constraint(model.tidx, rule =lambda model, k: model.x[0,k]<= xU if k < model.N else pyo.Constraint.Skip)
+    model.constraint2= pyo.Constraint(model.tidx, rule =lambda model, k: model.x[0,k]>= xL if k < model.N else pyo.Constraint.Skip )
+    model.constraint3= pyo.Constraint(model.tidx, rule =lambda model, k: model.x[1,k]<= xU if k < model.N else pyo.Constraint.Skip)
+    model.constraint4= pyo.Constraint(model.tidx, rule =lambda model, k: model.x[1,k]>= xL if k < model.N else pyo.Constraint.Skip)
+    model.constraint5= pyo.Constraint(model.tidx, rule =lambda model, k: model.x[2,k]<= xU if k < model.N else pyo.Constraint.Skip)
+    model.constraint6= pyo.Constraint(model.tidx, rule =lambda model, k: model.x[2,k]>= xL if k < model.N else pyo.Constraint.Skip)
+    model.constraint9= pyo.Constraint(model.tidx, rule =lambda model, k: model.u[0,k]<= uU[0] if k < model.N else pyo.Constraint.Skip)
+    model.constraint10= pyo.Constraint(model.tidx, rule =lambda model, k: model.u[0,k]>= uL[0] if k < model.N else pyo.Constraint.Skip)
+    model.constraint11= pyo.Constraint(model.tidx, rule =lambda model, k: model.u[1,k]<= uU[1] if k < model.N else pyo.Constraint.Skip)
+    model.constraint12= pyo.Constraint(model.tidx, rule =lambda model, k: model.u[1,k]>= uL[1] if k < model.N else pyo.Constraint.Skip)
+
+    solver = pyo.SolverFactory('ipopt')
+    results = solver.solve(model)
+
+    if str(results.solver.termination_condition) == "optimal":
+        feas = True
+    else:
+        feas = False
+
+    xOpt = np.asarray([[model.x[i,t]() for i in model.xidx] for t in model.tidx]).T
+    uOpt = np.asarray([model.u[:,t]() for t in model.tidx]).T
+
+    JOpt = model.cost()
+
+    return [model, feas, xOpt, uOpt, JOpt]
+
+if __name__ == '__main__':
+  timePoints = [0, 300, 900, 1200, 1800, 2100]
+  TempPoints = np.array([23, 23, 65, 65, 23, 23]) + 273
+  Ts = 5
+  t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
+
+
+N = 5
+Q = np.array([[100, 0, 0], [0, 0, 0], [0, 0, 0]])
+R = np.identity(2)
+Xl = (273+5)
+Xu = (273+150)
+Ul = np.array([-12, 0])
+Uu = np.array([12, 1])
+x0 = np.array([273+23, 273+23, 273+23])
+
+x_actual = []
+u_actual = []
+x_cur = x0
+u_cur = [0,0]
+x_OL = np.zeros((3,N+1,len(t)))
+
+for i in range(len(t) - N):
+  print("Starting MPC")
+  xref = np.array([Setpoint[i:i+N], Setpoint[i:i+N], Setpoint[i:i+N]])
+  model, feas, xOpt, uOpt, JOpt = cftoc(N, Q, R, xref, x_cur, Xl, Xu, Ul, Uu)
+  x_OL[:,:,i] = xOpt
+  x_cur = xOpt[:,1]
+  x_actual.append(xOpt[:,1])
+  u_actual.append(uOpt[:,0])
+  u_cur = uOpt[:,0]
+  # line1 = plt.plot(t[i:i+N+1],xOpt[0,:], 'r--')
+print("Finished MPC")
+x_actual = np.array(x_actual)
+u_actual = np.array(u_actual)
+
+line2 = plt.plot(t,Setpoint, 'r--')
+line2 = plt.plot(t[0:len(t) - N],x_actual[:,0], 'b--')
+plt.show()
+plt.plot(u_actual)
+
+plt.show()
