@@ -10,20 +10,21 @@ from scipy.signal import cont2discrete
 
 def thermoElectricTempControlModel(Ts, x, u):
   # Model Constant Values
-  C_Fluid = 800.0
-  C_Reservoir = 1000.0
-  C_HEXplate = 600.0
 
+  C_Fluid = 200.0
+  C_Reservoir = 400.0
+  C_HEXplate = 300.0
+  
   R_Fluid_Ambient = 10.0
   R_Reservoir_Ambient = 3.0
   R_HEXplate_Ambient = 1.0
-  R_Fluid_Reservoir = 0.5
-
-  T_Ambient = 23.0
-
-  R_TEC = 0.02              # Electrical Resistance of Thermoelectric device in Ohms
-  alpha_TEC = 220 * 10**-6  # Seebeck Coefficient of TEC in V/Kelvin
-  K_TEC = 1.5 * 10**-3      # Thermal Conductance of TEC between hot and cold side
+  R_Fluid_Reservoir = 0.2
+  
+  T_Ambient = 23.0 + 273
+  
+  R_TEC = 3.0              # Electrical Resistance of Thermoelectric device in Ohms
+  alpha_TEC = 220 * 10**-4  # Seebeck Coefficient of TEC in V/Kelvin
+  K_TEC = 1.5 * 10**-2      # Thermal Conductance of TEC between hot and cold side
   qmax_HEX = 80.0            # Maximum Cooling capability of Heat exchanger in Watts
 
   # State Variables
@@ -59,13 +60,19 @@ def thermoElectricTempControlModel(Ts, x, u):
   return x_next
 
 def plotResults(t,x):
-  fig = plt.figure(figsize=(9,5))
+  fig = plt.figure(figsize=(16,4))
   plt.subplot(1,3,1)
   plt.plot(t,x[:,0])
+  plt.xlabel('Time (s)')
+  plt.ylabel('Fluid Temperature (K)')
   plt.subplot(1,3,2)
   plt.plot(t,x[:,1])
+  plt.xlabel('Time (s)')
+  plt.ylabel('Reservoir Temperature (K)')
   plt.subplot(1,3,3)
   plt.plot(t,x[:,2])
+  plt.xlabel('Time (s)')
+  plt.ylabel('Heat Exchanger Temperature (K)')
   plt.show()
 
 N = 50

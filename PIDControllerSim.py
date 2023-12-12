@@ -109,6 +109,9 @@ for k in range(len(t)):
 print(x)
 
 plt.figure()
-plt.plot(t, x[0:len(t),0], 'b--')
-plt.plot(t,Setpoint,'r--')
+line1 = plt.plot(t, x[0:len(t),0], 'b--')
+line2 = plt.plot(t,Setpoint,'go-')
+plt.legend([line2[0], line1[0]], ['Reference Temperature', 'PID']);
+plt.xlabel('Time (s)')
+plt.ylabel('Fluid Temperature (K)')
 plt.show()
