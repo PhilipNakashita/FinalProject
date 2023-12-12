@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.signal import cont2discrete
 
 def thermoElectricTempControlModel(Ts, x, u):
   # Model Constant Values
@@ -9,7 +10,7 @@ def thermoElectricTempControlModel(Ts, x, u):
   R_Fluid_Ambient = 10.0
   R_Reservoir_Ambient = 3.0
   R_HEXplate_Ambient = 1.0
-  R_Fluid_Reservoir = 0.2
+  R_Fluid_Reservoir = 0.1
 
   T_Ambient = 23.0 + 273
 
@@ -49,3 +50,49 @@ def thermoElectricTempControlModel(Ts, x, u):
   x_next= np.array(x_next)
 
   return x_next
+
+def simLinearSystem(Ad, Bd, x, u):
+  x_next = np.zeros((1,3))
+  x_next[0,:] = Ad @ x + Bd @ u 
+
+  return x_next
+
+def linearizeModel(Ts, x, u):
+  # Model Constant Values
+  C_Fluid = 200.0
+  C_Reservoir = 400.0
+  C_HEXplate = 300.0
+
+  R_Fluid_Ambient = 10.0
+  R_Reservoir_Ambient = 3.0
+  R_HEXplate_Ambient = 1.0
+  R_Fluid_Reservoir = 0.1
+
+  T_Ambient = 23.0 + 273
+
+  R_TEC = 3.0              # Electrical Resistance of Thermoelectric device in Ohms
+  alpha_TEC = 220 * 10**-4  # Seebeck Coefficient of TEC in V/Kelvin
+  K_TEC = 1.5 * 10**-2      # Thermal Conductance of TEC between hot and cold side
+  qmax_HEX = 80.0            # Maximum Cooling capability of Heat exchanger in Watts
+
+  # State Variables
+  T_Fluid = x[0]
+  T_Reservoir = x[1]
+  T_HEXplate = x[2]
+
+  # Control Inputs
+  V_TEC = u[0]                                              # Voltage Applied to TEC module
+  #q_HEX = min(u[1]*(T_HEXplate - T_Ambient)/0.01,qmax_HEX)  # Liquid to Ambient Heat Exchanger
+
+  A = np.array([[(1/(C_Fluid*R_Fluid_Reservoir)),-(1/(C_Fluid*R_Fluid_Reservoir)),0],
+                [-(1/(C_Fluid*R_Fluid_Reservoir)),(-K_TEC-((alpha_TEC*V_TEC)/R_TEC)-(1/R_Reservoir_Ambient)+(1/R_Fluid_Reservoir))/(C_Reservoir) ,K_TEC/C_Reservoir],
+                [0, K_TEC/C_HEXplate, (-K_TEC + ((alpha_TEC * V_TEC)/R_TEC) - (1 / R_HEXplate_Ambient))/(C_HEXplate)]])
+  B = np.array([[0,0],
+              [-(((alpha_TEC*T_Reservoir)/R_TEC)+(V_TEC/R_TEC))/C_Reservoir,0],
+              [(((alpha_TEC*T_HEXplate)/R_TEC)+(V_TEC/R_TEC))/C_HEXplate,-1/C_HEXplate]])
+
+  C = np.eye(3)
+  D = np.array([[0,0],[0,0],[0,0]])
+
+  Ad, Bd, Cd, Dd, dt = cont2discrete((A,B,C,D), Ts, method='euler')
+  return Ad, Bd
