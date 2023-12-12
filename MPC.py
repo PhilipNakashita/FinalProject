@@ -167,3 +167,6 @@ u_actual = np.array(u_actual)
 line2 = plt.plot(t,Setpoint, 'r--')
 line2 = plt.plot(t[0:len(t) - N],x_actual[:,0], 'b--')
 plt.show()
+plt.plot(u_actual)
+
+plt.show()
