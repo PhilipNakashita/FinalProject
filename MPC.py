@@ -9,7 +9,7 @@ from sympy.core.function import diff
 from scipy.signal import cont2discrete
 from ReferenceTrajectory import generateTrajectory
 
-def cftoc(N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan):
+def cftoc(N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan,stateNoise=np.array([0.0, 0.0, 0.0])):
     # Initialize values for LQR MPC problem
     numStates = 3
     numInputs = 2
@@ -92,9 +92,9 @@ def cftoc(N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan):
             Tdot_HEXplate = 1/C_HEXplate*(q_HEXplate_Ambient - q_TEC_HEXplate - q_HEX)
            
             # Euler Discretization and Caluclation of Next State
-            model.dynamics_contraints.add(expr = model.x[0, t+1] == Ts*Tdot_Fluid + T_Fluid)
-            model.dynamics_contraints.add(expr = model.x[1, t+1] == Ts*Tdot_Reservoir + T_Reservoir)
-            model.dynamics_contraints.add(expr = model.x[2, t+1] == Ts*Tdot_HEXplate + T_HEXplate)
+            model.dynamics_contraints.add(expr = model.x[0, t+1] == Ts*Tdot_Fluid + T_Fluid + stateNoise[0])
+            model.dynamics_contraints.add(expr = model.x[1, t+1] == Ts*Tdot_Reservoir + T_Reservoir + stateNoise[1])
+            model.dynamics_contraints.add(expr = model.x[2, t+1] == Ts*Tdot_HEXplate + T_HEXplate+ stateNoise[2])
 
     # Initial value constraints
     model.init_const1 = pyo.Constraint(expr = model.x[0, 0] == x0[0])
@@ -135,38 +135,37 @@ if __name__ == '__main__':
   t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
 
 
-N = 10
-Q = np.array([[100, 0, 0], [0, 0, 0], [0, 0, 0]])
-R = np.identity(2)
-Xl = (273+5)
-Xu = (273+150)
-Ul = np.array([-12, 0])
-Uu = np.array([12, 1])
-x0 = np.array([273+23, 273+23, 273+23])
+  N = 10
+  Q = np.array([[100, 0, 0], [0, 0, 0], [0, 0, 0]])
+  R = np.identity(2)
+  Xl = (273+5)
+  Xu = (273+150)
+  Ul = np.array([-12, 0])
+  Uu = np.array([12, 1])
+  x0 = np.array([273+23, 273+23, 273+23])
 
-x_actual = []
-u_actual = []
-x_cur = x0
-u_cur = [0,0]
-x_OL = np.zeros((3,N+1,len(t)))
+  x_actual = []
+  u_actual = []
+  x_cur = x0
+  u_cur = [0,0]
+  x_OL = np.zeros((3,N+1,len(t)))
 
-for i in range(len(t) - N):
-  #print("Starting MPC")
-  xref = np.array([Setpoint[i:i+N], Setpoint[i:i+N], Setpoint[i:i+N]])
-  model, feas, xOpt, uOpt, JOpt = cftoc(N, Q, R, xref, x_cur, Xl, Xu, Ul, Uu)
-  x_OL[:,:,i] = xOpt
-  x_cur = xOpt[:,1]
-  x_actual.append(xOpt[:,1])
-  u_actual.append(uOpt[:,0])
-  u_cur = uOpt[:,0]
-  # line1 = plt.plot(t[i:i+N+1],xOpt[0,:], 'r--')
-print("Finished MPC")
-x_actual = np.array(x_actual)
-u_actual = np.array(u_actual)
+  for i in range(len(t) - N):
+    #print("Starting MPC")
+    xref = np.array([Setpoint[i:i+N], Setpoint[i:i+N], Setpoint[i:i+N]])
+    model, feas, xOpt, uOpt, JOpt = cftoc(N, Q, R, xref, x_cur, Xl, Xu, Ul, Uu)
+    x_OL[:,:,i] = xOpt
+    x_cur = xOpt[:,1]
+    x_actual.append(xOpt[:,1])
+    u_actual.append(uOpt[:,0])
+    u_cur = uOpt[:,0]
+    # line1 = plt.plot(t[i:i+N+1],xOpt[0,:], 'r--')
+  print("Finished MPC")
+  x_actual = np.array(x_actual)
+  u_actual = np.array(u_actual)
 
-line2 = plt.plot(t,Setpoint, 'r--')
-line2 = plt.plot(t[0:len(t) - N],x_actual[:,0], 'b--')
-plt.show()
-plt.plot(u_actual)
-
-plt.show()
+  line2 = plt.plot(t,Setpoint, 'r--')
+  line2 = plt.plot(t[0:len(t) - N],x_actual[:,0], 'b--')
+  plt.show()
+  plt.plot(u_actual)
+  plt.show()

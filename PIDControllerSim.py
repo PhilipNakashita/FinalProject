@@ -80,52 +80,53 @@ def plotResults(t,x):
   plt.plot(t,x[:,2])
   plt.show()
 
-Ts = 5.0
-Kp = 25.0
-Ki = 0.1
-Kd = 0.4
+if __name__ == '__main__':
+  Ts = 5.0
+  Kp = 10.0
+  Ki = 0.1
+  Kd = 0.4
 
-temperatureController = PID_Controller(Ts,Kp,Ki,Kd)
-temperatureController.setActuatorLimits(-12,12)
+  temperatureController = PID_Controller(Ts,Kp,Ki,Kd)
+  temperatureController.setActuatorLimits(-12,12)
 
-## Generate Reference Trajectory
-timePoints = [0, 300, 900, 1200, 1800, 2100, 2600, 3000]
-TempPoints = [296, 296, 338, 338, 320, 320, 296, 296 ]
-t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
+  ## Generate Reference Trajectory
+  timePoints = [0, 300, 900, 1200, 1800, 2100, 2600, 3000]
+  TempPoints = [296, 296, 338, 338, 320, 320, 296, 296 ]
+  t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
 
-## Simulate Thermal Control System
-x0 = np.ones((1,3))*(23 + 273)
-x = x0
-u = np.zeros((len(t),2))
-error = np.zeros((1,1))
+  ## Simulate Thermal Control System
+  x0 = np.ones((1,3))*(23 + 273)
+  x = x0
+  u = np.zeros((len(t),2))
+  error = np.zeros((1,1))
 
-# Nonlinear Sym
-for k in range(len(t)):
-  error = Setpoint[k] - x[k,0]
-  u[k,0] = -temperatureController.computeControlInput(error)
-  if u[k,0] > 0:
-    u[k,1] = u[k,0]/12.0
-  else:
-    u[k,1] = 0
-  print(u[k,:])
-  x_next = thermoElectricTempControlModel(Ts,x[k,:],u[k,:])
-  x = np.append(x,x_next,axis=0)
+  # Nonlinear Sym
+  for k in range(len(t)):
+    error = Setpoint[k] - x[k,0]
+    u[k,0] = -temperatureController.computeControlInput(error)
+    if u[k,0] > 0:
+      u[k,1] = u[k,0]/12.0
+    else:
+      u[k,1] = 0.0
+    print(u[k,:])
+    x_next = thermoElectricTempControlModel(Ts,x[k,:],u[k,:])
+    x = np.append(x,x_next,axis=0)
 
-# Linear Sim
-x_lin = x0
-u_lin = np.zeros((len(t),2))
-Ad, Bd = linearizeModel(Ts, x_lin[0,:],u_lin[0,:])
-print(eig(Ad))
-print(f"Ad = {Ad}")
-print(f"Bd = {Bd}")
-for k in range(len(t)):
-  u_lin[k,0] = -temperatureController.computeControlInput(Setpoint[k] - x_lin[k,0])
-  u_lin[k,1] = 0
-  
-  x_lin_next = simLinearSystem(Ad, Bd, x_lin[k,:],u_lin[k,:])
-  x_lin = np.append(x_lin,x_lin_next,axis=0)
+  # Linear Sim
+  x_lin = x0
+  u_lin = np.zeros((len(t),2))
+  Ad, Bd = linearizeModel(Ts, x_lin[0,:],u_lin[0,:])
+  print(eig(Ad))
+  print(f"Ad = {Ad}")
+  print(f"Bd = {Bd}")
+  for k in range(len(t)):
+    u_lin[k,0] = -temperatureController.computeControlInput(Setpoint[k] - x_lin[k,0])
+    u_lin[k,1] = 0
+    
+    x_lin_next = simLinearSystem(Ad, Bd, x_lin[k,:],u_lin[k,:])
+    x_lin = np.append(x_lin,x_lin_next,axis=0)
 
-plt.figure()
-plt.plot(t, x[0:len(t),0], 'b--')
-plt.plot(t,Setpoint,'r--')
-plt.show()
+  plt.figure()
+  plt.plot(t, x[0:len(t),0], 'b--')
+  plt.plot(t,Setpoint,'r--')
+  plt.show()
