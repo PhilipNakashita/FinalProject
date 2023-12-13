@@ -164,9 +164,42 @@ print("Finished MPC")
 x_actual = np.array(x_actual)
 u_actual = np.array(u_actual)
 
-line2 = plt.plot(t,Setpoint, 'r--')
-line2 = plt.plot(t[0:len(t) - N],x_actual[:,0], 'b--')
-plt.show()
-plt.plot(u_actual)
+def sum_least_squares(reference_trajectory, modified_trajectory):
+
+    # Convert trajectories to numpy arrays
+    ref_array = np.array(reference_trajectory)
+    mod_array = np.array(modified_trajectory)
+
+    # Calculate the sum of squared differences
+    squared_diff = (ref_array - mod_array)**2
+
+    # Sum the squared differences
+    sum_squared_diff = np.sum(squared_diff)
+
+    return sum_squared_diff
+
+from PIDControllerSim import x_pid
+# Example usage
+reference_trajectory = Setpoint[:596]
+mpc_trajectory = x_actual[:,0]
+pid_trajectory = x_pid[:596]
+
+result = sum_least_squares(reference_trajectory, mpc_trajectory)
+result2 = sum_least_squares(reference_trajectory, pid_trajectory)
+print("Sum of Least Squares (MPC):", result)
+print("Sum of Least Squares (PID):", result2)
+
+
+line2 = plt.plot(t,Setpoint, 'r--',label = "Reference Trajectory")
+line2 = plt.plot(t[0:len(t) - N],x_actual[:,0], 'b--', label = "MPC Trajectory")
+line2 = plt.plot(t,x_pid, 'g--', label = "PID Trajectory")
+plt.legend()
+legend = plt.legend()
+legend.texts.append(plt.text(1525,330,'Least Squares Sum MPC = ' + str(result) + ')', fontsize=10))
+legend.texts.append(plt.text(1525,328,'Least Squares Sum PID = ' + str(result2) + ')', fontsize=10))
+plt.xlabel('time (in sec)')
+plt.ylabel('Temperature (K)')
+plt.title("Comparison of MPC and PID controller to the Reference Temperature Trajectory")
 
 plt.show()
+
