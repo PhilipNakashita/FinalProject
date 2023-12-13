@@ -129,13 +129,13 @@ def cftoc(N,Q,R,xref, x0,xL,xU,uL,uU,Af=np.nan,bf=np.nan):
     return [model, feas, xOpt, uOpt, JOpt]
 
 if __name__ == '__main__':
-  timePoints = [0, 300, 900, 1200, 1800, 2100]
-  TempPoints = np.array([23, 23, 65, 65, 23, 23]) + 273
+  timePoints = [0, 300, 900, 1200, 1800, 2100, 2600, 3000]
+  TempPoints = [296, 296, 338, 338, 320, 320, 296, 296 ]
   Ts = 5
   t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
 
 
-N = 5
+N = 10
 Q = np.array([[100, 0, 0], [0, 0, 0], [0, 0, 0]])
 R = np.identity(2)
 Xl = (273+5)
@@ -151,7 +151,7 @@ u_cur = [0,0]
 x_OL = np.zeros((3,N+1,len(t)))
 
 for i in range(len(t) - N):
-  print("Starting MPC")
+  #print("Starting MPC")
   xref = np.array([Setpoint[i:i+N], Setpoint[i:i+N], Setpoint[i:i+N]])
   model, feas, xOpt, uOpt, JOpt = cftoc(N, Q, R, xref, x_cur, Xl, Xu, Ul, Uu)
   x_OL[:,:,i] = xOpt

@@ -81,7 +81,7 @@ def plotResults(t,x):
   plt.show()
 
 Ts = 5.0
-Kp = 5.0
+Kp = 25.0
 Ki = 0.1
 Kd = 0.4
 
@@ -89,8 +89,8 @@ temperatureController = PID_Controller(Ts,Kp,Ki,Kd)
 temperatureController.setActuatorLimits(-12,12)
 
 ## Generate Reference Trajectory
-timePoints = [0, 300, 900]
-TempPoints = [296, 296, 338]
+timePoints = [0, 300, 900, 1200, 1800, 2100, 2600, 3000]
+TempPoints = [296, 296, 338, 338, 320, 320, 296, 296 ]
 t,Setpoint = generateTrajectory(timePoints,TempPoints,Ts)
 
 ## Simulate Thermal Control System
@@ -103,7 +103,10 @@ error = np.zeros((1,1))
 for k in range(len(t)):
   error = Setpoint[k] - x[k,0]
   u[k,0] = -temperatureController.computeControlInput(error)
-  u[k,1] = 1
+  if u[k,0] > 0:
+    u[k,1] = u[k,0]/12.0
+  else:
+    u[k,1] = 0
   print(u[k,:])
   x_next = thermoElectricTempControlModel(Ts,x[k,:],u[k,:])
   x = np.append(x,x_next,axis=0)
@@ -117,7 +120,7 @@ print(f"Ad = {Ad}")
 print(f"Bd = {Bd}")
 for k in range(len(t)):
   u_lin[k,0] = -temperatureController.computeControlInput(Setpoint[k] - x_lin[k,0])
-  u_lin[k,1] = 1
+  u_lin[k,1] = 0
   
   x_lin_next = simLinearSystem(Ad, Bd, x_lin[k,:],u_lin[k,:])
   x_lin = np.append(x_lin,x_lin_next,axis=0)
