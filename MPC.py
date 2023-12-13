@@ -186,9 +186,9 @@ def sum_least_squares(reference_trajectory, modified_trajectory):
 
 from PIDControllerSim import x_pid
 # Example usage
-reference_trajectory = Setpoint[:596]
+reference_trajectory = Setpoint[:591]
 mpc_trajectory = x_actual[:,0]
-pid_trajectory = x_pid[:596]
+pid_trajectory = x_pid[:591]
 
 result = sum_least_squares(reference_trajectory, mpc_trajectory)
 result2 = sum_least_squares(reference_trajectory, pid_trajectory)
