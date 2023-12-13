@@ -196,16 +196,14 @@ print("Sum of Least Squares (MPC):", result)
 print("Sum of Least Squares (PID):", result2)
 
 
-line2 = plt.plot(t,Setpoint, 'r--',label = "Reference Trajectory")
-line2 = plt.plot(t[0:len(t) - N],x_actual[:,0], 'b--', label = "MPC Trajectory")
-line2 = plt.plot(t,x_pid, 'g--', label = "PID Trajectory")
+line2 = plt.plot(t,Setpoint, 'b--',label = "Setpoint")
+line2 = plt.plot(t,x_pid, 'r--', label = "PID (e\u00b2 = " + str(round(result2)) + ")")
+line2 = plt.plot(t[0:len(t) - N],x_actual[:,0], 'g--', label = "MPC (e\u00b2 = " + str(round(result)) + ")" )
+
 plt.legend()
-legend = plt.legend()
-legend.texts.append(plt.text(1525,330,'Least Squares Sum MPC = ' + str(result) + ')', fontsize=10))
-legend.texts.append(plt.text(1525,328,'Least Squares Sum PID = ' + str(result2) + ')', fontsize=10))
 plt.xlabel('time (in sec)')
 plt.ylabel('Temperature (K)')
-plt.title("Comparison of MPC and PID controller to the Reference Temperature Trajectory")
+plt.title("MPC (N= 10) vs. PID controller")
 
 plt.show()
 
